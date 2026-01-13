@@ -32,8 +32,8 @@ from optparse import OptionParser
 # --- Language Strings ---
 
 LANG_STRINGS_EN = {
-    "banner_title": "> shcheck.py - santoru ..............................", # Kept in case banner is re-enabled
-    "banner_subtitle": " Simple tool to check security headers on a webserver ", # Kept in case banner is re-enabled
+    "banner_title": "> shcheck.py - santoru ..............................",
+    "banner_subtitle": " Simple tool to check security headers on a webserver ",
     "unknown_url_type": "Unknown url type",
     "http_error": "[!] URL Returned an HTTP error: {}",
     "ssl_error": "SSL: Certificate validation error.\nIf you want to ignore it run the program with the \"-d\" option.",
@@ -45,10 +45,10 @@ LANG_STRINGS_EN = {
     "header_present": "[*] Header {} is present! (Value: {})",
     "header_present_no_value": "[*] Header {} is present!",
     "csp_value": "Value:",
-    "xss_present_disabled": "[*] Header {} is present! (Value: {})", # XSS Protection = 0 is technically present but disabled
     "insecure_referrer": "[!] Insecure header {} is set! (Value: {})",
     "insecure_hsts": "[!] Insecure header {} is set! (Value: {})",
     "missing_header": "[!] Missing security header: {}",
+    "obsolete_header_present": "[!] Obsolete header {} is present! (Value: {})",
     "info_disclosure_present": "[!] Possible information disclosure: header {} is present! (Value: {})",
     "no_info_disclosure": "[*] No information disclosure headers detected",
     "cache_header_present": "[!] Cache control header {} is present! (Value: {})",
@@ -73,12 +73,11 @@ LANG_STRINGS_EN = {
     "option_colours": "Set up a colour profile [dark/light/none]",
     "option_colors_alias": "Alias for colours for US English",
     "option_language": "Set output language [en/es]",
-    "obsolete_header_notice": "(Note: This header is obsolete)", # New string
 }
 
 LANG_STRINGS_ES = {
-    "banner_title": "> shcheck.py - santoru ..............................", # Se mantiene por si se reactiva el banner
-    "banner_subtitle": " Herramienta simple para comprobar cabeceras de seguridad ", # Se mantiene por si se reactiva el banner
+    "banner_title": "> shcheck.py - santoru ..............................",
+    "banner_subtitle": " Herramienta simple para comprobar cabeceras de seguridad ",
     "unknown_url_type": "Tipo de URL desconocido",
     "http_error": "[!] La URL devolvió un error HTTP: {}",
     "ssl_error": "SSL: Error de validación de certificado.\nSi quieres ignorarlo, ejecuta el programa con la opción \"-d\".",
@@ -90,10 +89,10 @@ LANG_STRINGS_ES = {
     "header_present": "[*] ¡Cabecera {} presente! (Valor: {})",
     "header_present_no_value": "[*] ¡Cabecera {} presente!",
     "csp_value": "Valor:",
-    "xss_present_disabled": "[*] ¡Cabecera {} presente! (Valor: {})", # XSS Protection = 0 técnicamente presente pero desactivado
     "insecure_referrer": "[!] ¡Cabecera insegura {} establecida! (Valor: {})",
     "insecure_hsts": "[!] ¡Cabecera insegura {} establecida! (Valor: {})",
     "missing_header": "[!] Falta cabecera de seguridad: {}",
+    "obsolete_header_present": "[!] ¡Cabecera obsoleta {} presente! (Valor: {})",
     "info_disclosure_present": "[!] Posible divulgación de información: ¡cabecera {} presente! (Valor: {})",
     "no_info_disclosure": "[*] No se detectaron cabeceras de divulgación de información",
     "cache_header_present": "[!] ¡Cabecera de control de caché {} presente! (Valor: {})",
@@ -118,7 +117,6 @@ LANG_STRINGS_ES = {
     "option_colours": "Configurar un perfil de color [dark/light/none]",
     "option_colors_alias": "Alias para colours (colores)",
     "option_language": "Establecer idioma de salida [en/es]",
-    "obsolete_header_notice": "(Nota: Esta cabecera está obsoleta)", # Nueva cadena
 }
 
 # Global language dictionary holder
@@ -136,8 +134,8 @@ class darkcolours:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKGREEN = '\033[92m'
-    WARNING = '\033[93m' # Orange/Yellow for warnings (like deprecated headers)
-    FAIL = '\033[91m'    # Red for errors/missing critical headers
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
@@ -146,7 +144,7 @@ class lightcolours:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKGREEN = '\033[92m'
-    WARNING = '\033[95m' # Using Magenta for warning in light mode (adjust if needed)
+    WARNING = '\033[95m'
     FAIL = '\033[91m'
     ENDC = '\033[0m'
     BOLD = '\033[1m'
@@ -173,27 +171,23 @@ client_headers = {
  Gecko/20100101 Firefox/53.0',
     'Accept': 'text/html,application/xhtml+xml,\
  application/xml;q=0.9,*/*;q=0.8',
-    'Accept-Language': 'en-US;q=0.8,en;q=0.3', # Keep this as client doesn't dictate server language choice here
+    'Accept-Language': 'en-US;q=0.8,en;q=0.3',
     'Upgrade-Insecure-Requests': '1'
  }
 
 
 # Security headers that should be enabled
 # Severity levels: 'error', 'warning', 'deprecated'
-# 'error': Critical missing header (Red)
-# 'warning': Recommended header missing OR obsolete header (Orange/Yellow)
-# 'deprecated': Truly obsolete/uncommon header, only shown if missing and --deprecated/-k is used (no color or standard text)
 sec_headers = {
     'X-XSS-Protection': 'warning',  # Obsolete, show warning if missing OR present
     'X-Frame-Options': 'warning',   # Obsolete, show warning if missing OR present
     'X-Content-Type-Options': 'warning',
     'Strict-Transport-Security': 'error',
     'Content-Security-Policy': 'warning',
-    'X-Permitted-Cross-Domain-Policies': 'deprecated', # Truly deprecated/obsolete
+    'X-Permitted-Cross-Domain-Policies': 'deprecated',
     'Referrer-Policy': 'warning',
-    'Expect-CT': 'deprecated', # Deprecated by Chrome
+    'Expect-CT': 'deprecated',
     'Permissions-Policy': 'warning',
-    # Cross-Origin-* headers removed as requested
 }
 
 information_headers = {
@@ -212,17 +206,6 @@ cache_headers = {
 }
 
 
-# Banner function remains defined but is not called by default in main()
-def banner():
-    log("")
-    log("======================================================")
-    log(_t("banner_title"))
-    log("------------------------------------------------------")
-    log(_t("banner_subtitle"))
-    log("======================================================")
-    log("")
-
-
 def colorize(string, alert):
     bcolors = darkcolours
     if options.colours == "light":
@@ -234,28 +217,23 @@ def colorize(string, alert):
         'warning':  bcolors.WARNING + string + bcolors.ENDC,
         'ok':       bcolors.OKGREEN + string + bcolors.ENDC,
         'info':     bcolors.OKBLUE + string + bcolors.ENDC,
-        'deprecated': string # No color for deprecated headers or not-an-issue ones
+        'deprecated': string
     }
     return color[alert] if alert in color else string
 
 
 def parse_headers(hdrs):
     global headers
-    # Ensure keys are lowercase for consistent lookup
     headers = dict((x.lower(), y) for x, y in hdrs)
 
 
 def append_port(target, port):
-    # Ensure target ends with / before appending port if necessary
     if not target.endswith('/'):
         target += '/'
-    # Use urlparse to handle complex URLs better? For now, simple string manipulation
     parts = urllib.parse.urlparse(target)
     netloc_parts = parts.netloc.split(':')
     new_netloc = netloc_parts[0] + ':' + port
-    # Reconstruct the URL
     new_target = urllib.parse.urlunparse((parts.scheme, new_netloc, parts.path, parts.params, parts.query, parts.fragment))
-    # Ensure it ends with a slash if the original did (or if path is empty)
     if target.endswith('/') and not new_target.endswith('/'):
          new_target += '/'
     elif not parts.path and not new_target.endswith('/'):
@@ -272,17 +250,14 @@ def build_opener(proxy, ssldisabled):
         })
         handlers.append(proxyhnd)
 
-    # Always add HTTPS handler, customize context if SSL disabled
     ctx = None
     if ssldisabled:
         ctx = ssl.create_default_context()
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
-    # Specify context only if SSL is disabled, otherwise use default
     sslhnd = urllib.request.HTTPSHandler(context=ctx) if ssldisabled else urllib.request.HTTPSHandler()
     handlers.append(sslhnd)
 
-    # Add default handlers too (like HTTPHandler)
     handlers.append(urllib.request.HTTPHandler)
 
     opener = urllib.request.build_opener(*handlers)
@@ -290,31 +265,24 @@ def build_opener(proxy, ssldisabled):
 
 
 def normalize(target):
-    # Add http:// if no scheme is present
     if not urllib.parse.urlparse(target).scheme:
-        # Check if it looks like a domain name or IP before prepending http
-        # This is a basic check, might need refinement
         parts = target.split(':')
         host = parts[0]
         try:
-            # Check if it's an IP address
-            socket.inet_pton(socket.AF_INET6, host) # Check IPv6 first
+            socket.inet_pton(socket.AF_INET6, host)
             target = 'http://' + target
         except (ValueError, socket.error):
             try:
-                socket.inet_aton(host) # Check IPv4
+                socket.inet_aton(host)
                 target = 'http://' + target
             except (ValueError, socket.error):
-                 # Assume domain name if not IP and contains a dot
                  if '.' in host:
                      target = 'http://' + target
-                 # else: handle potential local paths or invalid inputs? For now, proceed.
-
     return target
 
 
 def print_error(target, e):
-    sys.stdout = sys.__stdout__ # Ensure errors print even if json output redirected stdout
+    sys.stdout = sys.__stdout__
     if isinstance(e, ValueError):
         print(_t("unknown_url_type"))
 
@@ -322,16 +290,15 @@ def print_error(target, e):
         print(_t("http_error", colorize(str(e.code), 'error')))
 
     elif isinstance(e, urllib.error.URLError):
-        if hasattr(e.reason, 'errno') and e.reason.errno == 111: # Connection refused
+        if hasattr(e.reason, 'errno') and e.reason.errno == 111:
              print(_t("unreachable_host", target, f"Connection refused ({e.reason})"))
         elif "CERTIFICATE_VERIFY_FAILED" in str(e.reason):
             print(_t("ssl_error"))
         else:
             print(_t("unreachable_host", target, e.reason))
-    # Handle http.client exceptions separately if needed
     elif isinstance(e, http.client.UnknownProtocol):
          print(_t("unknown_protocol", e))
-    elif isinstance(e, socket.gaierror): # Handle DNS resolution errors
+    elif isinstance(e, socket.gaierror):
         print(_t("unreachable_host", target, f"Name or service not known ({e})"))
     elif isinstance(e, socket.timeout):
         print(f"[!] Timeout connecting to {target}")
@@ -340,11 +307,6 @@ def print_error(target, e):
 
 
 def check_target(target):
-    '''
-    Check connection to target and return the response object (or None on failure).
-    Handles HTTP/HTTPS and potential redirects.
-    '''
-    # Recover used options
     ssldisabled = options.ssldisabled
     useget = options.useget
     usemethod = options.usemethod
@@ -354,33 +316,27 @@ def check_target(target):
     target = normalize(target)
 
     request = urllib.request.Request(target, headers=client_headers)
-    # Set method
     method = "GET" if useget else usemethod
-    if not useget and usemethod != 'HEAD': # Ensure method is uppercase if not GET/HEAD
+    if not useget and usemethod != 'HEAD':
         method = usemethod.upper()
     request.get_method = lambda: method
 
-    # Build opener for proxy and SSL
     build_opener(proxy, ssldisabled)
     try:
-        response = urllib.request.urlopen(request, timeout=15) # Increased timeout slightly
-
-    # Handling issues
+        response = urllib.request.urlopen(request, timeout=15)
     except http.client.UnknownProtocol as e:
         print_error(target, e)
-        return None # Cannot proceed
+        return None
     except Exception as e:
         print_error(target, e)
-        # If it's a client error (4xx) or server error (5xx), we still got headers
         if hasattr(e, 'code') and isinstance(e, urllib.error.HTTPError):
-            response = e # Return the error object which contains headers
+            response = e
         else:
-            return None # Other errors mean no response/headers
+            return None
 
     if response is not None:
-        # Make sure we have the getheaders method
         if not hasattr(response, 'getheaders'):
-             log(_t("cant_read_response")) # Or a more specific error
+             log(_t("cant_read_response"))
              return None
         return response
 
@@ -389,9 +345,6 @@ def check_target(target):
 
 
 def is_https(target_url):
-    '''
-    Check if the *effective* URL (after potential redirects) uses HTTPS.
-    '''
     return urllib.parse.urlparse(target_url).scheme == 'https'
 
 
@@ -403,24 +356,23 @@ def report(target_url, safe, unsafe):
     log("")
 
 def parse_csp(csp_value):
-    # Basic CSP parsing for highlighting unsafe directives
     unsafe_keywords = ['unsafe-inline', 'unsafe-eval', 'unsafe-hashes', 'wasm-unsafe-eval']
-    warn_keywords = ["'self'", "'none'", "data:", "blob:", "filesystem:", "mediastream:", "*", "http:"] # Keywords that might be overly permissive or risky depending on context
+    warn_keywords = ["'self'", "'none'", "data:", "blob:", "filesystem:", "mediastream:", "*", "http:"]
     log(_t("csp_value"))
     directives = csp_value.split(";")
     for directive in directives:
-        parts = directive.strip().split(None, 1) # Split only on the first space
+        parts = directive.strip().split(None, 1)
         if not parts:
             continue
         directive_name = parts[0]
         values_str = parts[1] if len(parts) > 1 else ""
 
         colored_values = []
-        for value in values_str.split(): # Split values by space
+        for value in values_str.split():
             value_lower = value.lower()
             if value_lower in unsafe_keywords:
                 colored_values.append(colorize(value, 'error'))
-            elif value_lower in warn_keywords or ('*' in value and value_lower != "'*'") : # Highlight wildcards other than the specific ' * ' keyword if needed
+            elif value_lower in warn_keywords or ('*' in value and value_lower != "'*'") :
                  colored_values.append(colorize(value, 'warning'))
             else:
                 colored_values.append(value)
@@ -429,15 +381,14 @@ def parse_csp(csp_value):
 
 
 def main():
-    global options, STRINGS, json_headers # Make options and STRINGS global
+    global options, STRINGS, json_headers
 
     options, targets = parse_options()
 
-    # Set language based on options
     if options.language.lower() == 'es':
         STRINGS = LANG_STRINGS_ES
     else:
-        STRINGS = LANG_STRINGS_EN # Default to English
+        STRINGS = LANG_STRINGS_EN
 
     port = options.port
     cookie = options.cookie
@@ -448,36 +399,25 @@ def main():
     hfile = options.hfile
     json_output = options.json_output
 
-    # Disabling printing if json output is requested
     if json_output:
-        # Redirect stdout to /dev/null or NUL
         sys.stdout = open(os.devnull, 'w')
 
-    # banner() # <<< BANNER CALL COMMENTED OUT >>>
-
-    # Set custom cookies if provided
     if cookie is not None:
-        # Use update to avoid overwriting existing client_headers
         client_headers.update({'Cookie': cookie})
 
-    # Set custom headers if provided
     if custom_headers is not None:
         for header in custom_headers:
-            # Split supplied string of format 'Header: value'
-            header_split = header.split(':', 1) # Split only on the first colon
+            header_split = header.split(':', 1)
             if len(header_split) == 2:
-                 # Add to existing headers using header name and header value (strip whitespace)
                  client_headers.update({header_split[0].strip(): header_split[1].strip()})
             else:
-                 # Use __stdout__ to print error even if json redirected stdout
                  sys.stdout = sys.__stdout__
                  print(_t("invalid_header_format"))
-                 sys.stdout = open(os.devnull, 'w') if json_output else sys.__stdout__ # Restore redirection if needed
+                 sys.stdout = open(os.devnull, 'w') if json_output else sys.__stdout__
 
     if hfile is not None:
         try:
             with open(hfile) as f:
-                # Read lines, strip whitespace, remove empty lines
                 targets = [line.strip() for line in f if line.strip()]
         except FileNotFoundError:
              sys.stdout = sys.__stdout__
@@ -491,21 +431,18 @@ def main():
     if not targets:
         sys.stdout = sys.__stdout__
         print("[!] No targets specified either via command line or host file.")
-        # parser.print_help() # Consider showing help again
         sys.exit(1)
 
 
     # --- Main Loop ---
-    json_out = {} # Final JSON object containing results for all targets
+    json_out = {}
 
     for target in targets:
-        # Reset global headers dict for each target
         global headers
         headers = {}
-        # Reset json results structure for this target
         json_target_results = {}
 
-        original_target = target # Keep original for potential error messages
+        original_target = target
         if port is not None:
             target = append_port(target, port)
 
@@ -514,45 +451,35 @@ def main():
 
         log(_t("analyzing_headers", colorize(original_target, 'info')))
 
-        # Check if target is valid and get response
         response = check_target(target)
         if not response:
-            # Add a newline if not in JSON mode for better separation between failed targets
             if not json_output: print("")
-            continue # Skip to next target if connection failed
+            continue
 
-        # Get effective URL after redirects
         rUrl = response.geturl()
         log(_t("effective_url", colorize(rUrl, 'info')))
 
-        # Parse headers from the response (could be success or HTTPError response)
         parse_headers(response.getheaders())
 
-        # Prepare JSON structure for this specific target URL
         json_target_results = {"present": {}, "missing": []}
-        json_out[rUrl] = json_target_results # Add results under the effective URL key
+        json_out[rUrl] = json_target_results
 
         # --- Security Header Checks ---
 
-        # Check CSP for frame-ancestors *before* iterating sec_headers
         csp_header_value = headers.get("content-security-policy")
         csp_has_frame_ancestors = csp_header_value and "frame-ancestors" in csp_header_value.lower()
 
-        # Create a copy of sec_headers to potentially modify for this target
-        # (e.g., remove XFO check if CSP handles framing)
         current_sec_headers = sec_headers.copy()
         if csp_has_frame_ancestors and "X-Frame-Options" in current_sec_headers:
              current_sec_headers.pop("X-Frame-Options")
-             # Also remove XFO from the collected headers if present, so it doesn't show as 'present' incorrectly
-             # Although we handle it below too, this prevents it appearing in JSON 'present' list
              headers.pop("x-frame-options", None)
 
 
         current_target_is_https = is_https(rUrl)
 
-        for safeh in current_sec_headers: # Iterate over potentially modified list
-            lsafeh = safeh.lower() # Lowercase for checking existence in 'headers' dict
-            header_severity = current_sec_headers.get(safeh) # Severity from our policy dict
+        for safeh in current_sec_headers:
+            lsafeh = safeh.lower()
+            header_severity = current_sec_headers.get(safeh)
 
             if lsafeh in headers:
                 safe += 1
@@ -561,63 +488,46 @@ def main():
 
                 # --- Special Handling for Present Headers ---
 
-                # Determine the base log message first
-                log_msg = ""
-                if lsafeh == 'content-security-policy':
-                    log_msg = _t("header_present_no_value", colorize(safeh, 'ok'))
-                    # CSP parsing happens separately below
-                elif lsafeh == 'x-xss-protection' and header_value.strip().startswith('0'):
-                    log_msg = _t("xss_present_disabled", colorize(safeh, 'ok'), colorize(header_value, 'warning'))
-                elif lsafeh == 'referrer-policy' and header_value.lower() == 'unsafe-url':
-                    log_msg = _t("insecure_referrer", colorize(safeh, 'warning'), colorize(header_value, 'error'))
-                elif lsafeh == 'strict-transport-security' and "max-age=0" in header_value.replace(" ", ""):
-                    log_msg = _t("insecure_hsts", colorize(safeh, 'warning'), colorize(header_value, 'error'))
-                else:
-                    # Generic case for present headers
-                    log_msg = _t("header_present", colorize(safeh, 'ok'), header_value)
-
-                # <<< NEW: Check if this present header is one of the known obsolete ones >>>
                 if lsafeh in ['x-xss-protection', 'x-frame-options']:
-                    # Append the obsolete notice, colored as a warning
-                    log_msg += colorize(" " + _t("obsolete_header_notice"), 'warning')
+                    log_msg = _t("obsolete_header_present", colorize(safeh, 'warning'), header_value)
+                    log(log_msg)
 
-                # Now log the potentially modified message
-                log(log_msg)
-
-                # Handle CSP parsing separately if it was the CSP header
-                if lsafeh == 'content-security-policy':
-                     parse_csp(header_value)
+                elif lsafeh == 'content-security-policy':
+                    log(_t("header_present_no_value", colorize(safeh, 'ok')))
+                    parse_csp(header_value)
+                elif lsafeh == 'referrer-policy' and header_value.lower() == 'unsafe-url':
+                    log(_t("insecure_referrer", colorize(safeh, 'warning'), colorize(header_value, 'error')))
+                elif lsafeh == 'strict-transport-security' and "max-age=0" in header_value.replace(" ", ""):
+                    log(_t("insecure_hsts", colorize(safeh, 'warning'), colorize(header_value, 'error')))
+                else:
+                    log(_t("header_present", colorize(safeh, 'ok'), header_value))
 
             else:
                 # --- Handling Missing Headers ---
                 if lsafeh in ['x-xss-protection', 'x-frame-options']:
-                    continue # Go to the next header in the loop, do not report as missing
+                    continue
+                
                 unsafe += 1
                 should_report_missing = True
 
-                # HSTS only makes sense on HTTPS URLs
                 if lsafeh == 'strict-transport-security' and not current_target_is_https:
-                    unsafe -= 1 # Don't count as missing if not HTTPS
+                    unsafe -= 1
                     should_report_missing = False
 
-                # Hide 'deprecated' severity headers unless -k is specified
-                # Note: XSS/XFO are 'warning', so they won't be hidden by this check
                 if header_severity == "deprecated" and not show_deprecated:
-                    unsafe -= 1 # Don't count as missing
+                    unsafe -= 1
                     should_report_missing = False
 
-                # If we should report it, add to JSON and log
                 if should_report_missing:
                     json_target_results["missing"].append(safeh)
-                    log(_t("missing_header", colorize(safeh, header_severity))) # Use severity for color
+                    log(_t("missing_header", colorize(safeh, header_severity)))
 
         # --- Optional Checks ---
 
         if information:
-            # Initialize the dict within json_target_results
             json_target_results["information_disclosure"] = {}
             i_chk = False
-            log("") # Separator line
+            log("")
             for infoh in information_headers:
                 linfoh = infoh.lower()
                 if linfoh in headers:
@@ -625,16 +535,15 @@ def main():
                     json_target_results["information_disclosure"][infoh] = header_value
                     i_chk = True
                     log(_t("info_disclosure_present",
-                           colorize(infoh, 'warning'), # Info disclosure is a warning
+                           colorize(infoh, 'warning'),
                            header_value))
             if not i_chk:
                 log(_t("no_info_disclosure"))
 
         if cache_control:
-             # Initialize the dict within json_target_results
             json_target_results["caching"] = {}
             c_chk = False
-            log("") # Separator line
+            log("")
             for cacheh in cache_headers:
                 lcacheh = cacheh.lower()
                 if lcacheh in headers:
@@ -642,47 +551,45 @@ def main():
                      json_target_results["caching"][cacheh] = header_value
                      c_chk = True
                      log(_t("cache_header_present",
-                            colorize(cacheh, 'info'), # Cache headers are informational
+                            colorize(cacheh, 'info'),
                             header_value))
             if not c_chk:
                 log(_t("no_cache_headers"))
 
         # --- Report Summary for Target ---
         report(rUrl, safe, unsafe)
-        # json_out already updated with json_target_results earlier
 
     # --- Final Output ---
     if json_output:
-        sys.stdout = sys.__stdout__ # Restore standard output
-        # Dump the entire collected JSON data
-        print(json.dumps(json_out, indent=4)) # Pretty print JSON
+        sys.stdout = sys.__stdout__
+        print(json.dumps(json_out, indent=4))
 
 
-
+# <<< FUNCIÓN CORREGIDA >>>
 def parse_options():
-    # Use the global STRINGS dict for help messages
-    parser = OptionParser(_t("usage"), prog=sys.argv[0])
-
-    # Add language option first
-    parser.add_option("-l", "--language", dest="language", default="en",
-                      choices=["en", "es"],
-                      help="Set output language [en/es] [default: %default]") # Help text shouldn't be translated itself
-
-    # Parse once just to get the language
-    # This allows setting STRINGS before defining other options with translated help
-    temp_options, _ = parser.parse_args()
     global STRINGS
-    if temp_options.language.lower() == 'es':
+    
+    # --- Paso 1: Detectar el idioma manualmente antes de parsear ---
+    # Esto evita que parse_args() falle con opciones que todavía no conoce.
+    lang = 'en' # Idioma por defecto
+    args = sys.argv[1:]
+    for i, arg in enumerate(args):
+        if arg == '-l' or arg == '--language':
+            if i + 1 < len(args):
+                lang = args[i+1]
+                break
+    
+    if lang.lower() == 'es':
         STRINGS = LANG_STRINGS_ES
     else:
         STRINGS = LANG_STRINGS_EN
 
-    # Now define the rest of the options with potentially translated help
-    # Re-create parser with translated usage string if needed
-    parser = OptionParser(_t("usage"), prog=sys.argv[0]) # Re-init for translated usage
+    # --- Paso 2: Ahora creamos el parser definitivo con TODAS las opciones ---
+    parser = OptionParser(_t("usage"), prog=sys.argv[0])
+    
     parser.add_option("-l", "--language", dest="language", default="en",
                       choices=["en", "es"],
-                      help="Set output language [en/es] [default: %default]") # Add again
+                      help="Set output language [en/es] [default: %default]")
     parser.add_option("-p", "--port", dest="port",
                       help=_t("option_port"),
                       metavar="PORT")
@@ -701,7 +608,7 @@ def parse_options():
                       default=False, help=_t("option_use_get"),
                       action="store_true")
     parser.add_option('-m', "--use-method", dest="usemethod", default='HEAD',
-                      choices=["HEAD", "GET", "POST", "PUT", "DELETE", "TRACE", "OPTIONS", "PATCH"], # Added more methods
+                      choices=["HEAD", "GET", "POST", "PUT", "DELETE", "TRACE", "OPTIONS", "PATCH"],
                       help=_t("option_use_method"),)
     parser.add_option("-j", "--json-output", dest="json_output",
                       default=False, help=_t("option_json"),
@@ -713,26 +620,25 @@ def parse_options():
                       help=_t("option_caching"),
                       action="store_true")
     parser.add_option("-k", "--deprecated", dest="show_deprecated", default=False,
-                      help=_t("option_deprecated"), # Clarified help text
+                      help=_t("option_deprecated"),
                       action="store_true")
     parser.add_option("--proxy", dest="proxy",
                       help=_t("option_proxy"),
                       metavar="PROXY_URL")
-    parser.add_option("--hfile", dest="hfile",
+    parser.add_option("-f", "--hfile", dest="hfile",
                       help=_t("option_hfile"),
                       metavar="PATH_TO_FILE")
     parser.add_option("--colours", dest="colours",
                       help=_t("option_colours"),
                       default="dark", choices=['dark', 'light', 'none'])
-    parser.add_option("--colors", dest="colours", # Keep alias
-                      help=_t("option_colors_alias")) # Uses translated string for alias help
+    parser.add_option("--colors", dest="colours",
+                      help=_t("option_colors_alias"))
 
+    # --- Paso 3: Parseamos los argumentos una sola vez ---
     (options, targets) = parser.parse_args()
 
-    # Validate: Need targets if no host file provided
     if not targets and not options.hfile:
-        # Print help using the correct language now
-        sys.stdout = sys.__stdout__ # Ensure help prints to screen
+        sys.stdout = sys.__stdout__
         parser.print_help()
         sys.exit(1)
 
